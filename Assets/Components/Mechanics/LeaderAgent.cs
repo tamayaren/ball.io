@@ -1,48 +1,64 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
 public class LeaderAgent : MonoBehaviour
 {
-    [SerializeField] private Transform[] minions;
+    private Renderer renderer;
+    
+    [SerializeField] private List<Transform> minions = new List<Transform>();
     public UnityEvent<Transform> MinionChanged = new UnityEvent<Transform>();
 
+    public Color leaderColor;
     public int size;
 
+    public int leaderSeed;
+    
+
+    private void Awake()
+    {
+        TryGetComponent(out this.renderer);
+        this.leaderColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
+        
+        this.leaderSeed = Random.Range(0, int.MaxValue);
+    }
+    
     private void Start()
     {
         this.MinionChanged.AddListener((Transform minion) =>
         {
-            this.size = this.minions.Length; 
+            this.size = this.minions.Count; 
         });
         
+        this.renderer.material.color = this.leaderColor;
     }
     
-    private void Update()
-    {
-        
-    }
-
     public void AddMinion(Transform minion)
     {
         MinionAgent minionAgent = minion.GetComponent<MinionAgent>();
-        this.minions[^1] = minion;
-        minionAgent.SetLeader(this.transform);
+        minionAgent.SetLeader(this);
         
-        this.MinionChanged.Invoke(this.minions[^1]);
+        this.minions.Add(minion);
+        this.MinionChanged.Invoke(minion);
     }
 
     public void RemoveMinion()
     {
         Transform minion = this.minions[^1];
         MinionAgent minionAgent = minion.GetComponent<MinionAgent>();
-        minionAgent.SetLeader(null);
+        minionAgent.SetLeader();
         
-        this.minions[^1] = null;
+        this.minions.Remove(minion);
         this.MinionChanged.Invoke(minion);
     }
 
     public void TransformMinionsToLeader(LeaderAgent leaderAgent)
     {
+        foreach (Transform minion in this.minions)
+        {
+            leaderAgent.AddMinion(minion);
+        }
         
+        this.minions.Clear();
     }
 }
