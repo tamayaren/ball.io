@@ -1,12 +1,14 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using Random = UnityEngine.Random;
 
 public class LeaderAgent : MonoBehaviour
 {
     private Renderer renderer;
     
-    [SerializeField] private List<Transform> minions = new List<Transform>();
+    [SerializeField] public List<Transform> minions = new List<Transform>();
     public UnityEvent<Transform> MinionChanged = new UnityEvent<Transform>();
 
     public Color leaderColor;
@@ -32,7 +34,12 @@ public class LeaderAgent : MonoBehaviour
         
         this.renderer.material.color = this.leaderColor;
     }
-    
+
+    private void OnDestroy()
+    {
+        GameEffectsMain.instance.Explode(this.transform.position, this.leaderColor);
+    }
+
     public void AddMinion(Transform minion)
     {
         MinionAgent minionAgent = minion.GetComponent<MinionAgent>();
@@ -42,9 +49,8 @@ public class LeaderAgent : MonoBehaviour
         this.MinionChanged.Invoke(minion);
     }
 
-    public void RemoveMinion()
+    public void RemoveMinion(Transform minion)
     {
-        Transform minion = this.minions[^1];
         MinionAgent minionAgent = minion.GetComponent<MinionAgent>();
         minionAgent.SetLeader();
         

@@ -1,5 +1,8 @@
+using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
+using Random = UnityEngine.Random;
 
 public class AgentWanderingState : MonoBehaviour
 {
@@ -8,7 +11,6 @@ public class AgentWanderingState : MonoBehaviour
     [SerializeField] private float timer;
     [SerializeField] [Range(1f, 50f)] private float wanderRadius;
     [SerializeField] [Range(1f, 50f)] private float chaseRadius;
-    [SerializeField] [Range(1f, 180f)] private float dotFieldOfView;
 
     [SerializeField] [Range(5f, 35f)] public float randomSpeed = 5f;
     
@@ -17,7 +19,9 @@ public class AgentWanderingState : MonoBehaviour
     [SerializeField] private AgentState state = AgentState.Wander;
 
     [SerializeField] private Vector3 targetPosition;
+    [SerializeField] private float fleeDistance;
 
+    public event Action<GameObject> OnDestroyAction = new Action<GameObject>(o => {});
     private int seed;
     
     private void Start()
@@ -26,6 +30,14 @@ public class AgentWanderingState : MonoBehaviour
         this.randomSpeed = Random.Range(5f, this.randomSpeed);
         
         this.agent.speed = this.randomSpeed;
+        
+        AIDebouncer.instance.RegisterAgent(this);
+    }
+
+    private void OnDestroy()
+    {
+        this.OnDestroyAction.Invoke(this.gameObject);
+        AIDebouncer.instance.UnregisterAgent(this);
     }
 
     private bool IsTargetVisible()
@@ -36,16 +48,7 @@ public class AgentWanderingState : MonoBehaviour
         Physics.Raycast(this.transform.position, directionToTarget * this.chaseRadius, out RaycastHit hit, distanceToTarget);
         if (distanceToTarget <= this.chaseRadius && hit.collider != null)
         {
-            if (hit.collider.gameObject.layer != LayerMask.NameToLayer("Player"))
-            {
-                return false;
-            }
-            
-            float angleCosineThreshold = Mathf.Cos(this.dotFieldOfView * .5f * Mathf.Deg2Rad);
-            if (Vector3.Dot(this.transform.forward, directionToTarget) >= angleCosineThreshold)
-            {
-                return true;
-            }
+            return true;
         }
         
         return false;
@@ -56,10 +59,11 @@ public class AgentWanderingState : MonoBehaviour
         if (!this.agent.pathPending && this.agent.remainingDistance <= this.agent.stoppingDistance)
         {
             Vector3 randomDirection = Random.insideUnitSphere * Mathf.Max(this.wanderRadius, 5f);
+            randomDirection = new(randomDirection.x, 0f, randomDirection.y);
             Vector3 computed = this.transform.position + randomDirection;
             
             NavMeshHit hit;
-            if (NavMesh.SamplePosition(computed, out hit, 1.0f, NavMesh.AllAreas))
+            if (NavMesh.SamplePosition(computed, out hit, this.wanderRadius, NavMesh.AllAreas))
             {
                 this.targetPosition = hit.position;
                 this.agent.SetDestination(hit.position);
@@ -76,10 +80,35 @@ public class AgentWanderingState : MonoBehaviour
         }
         bool targetVisibility = IsTargetVisible();
         
-        // TODO Implement Chase & Flee Dynamic State
+        if (targetVisibility)
+            this.agent.SetDestination(this.target.position);
+    }
+    
+    private void Flee()
+    {
+        if (!this.target)
+        {
+            Wander();
+            return;
+        }
+        
+        bool targetVisibility = IsTargetVisible();
+
+        if (targetVisibility)
+        {
+            Vector3 fleeDirection = (this.transform.position - this.target.position).normalized;
+            Vector3 theoreticalDestination = this.transform.position + fleeDirection * this.fleeDistance;
+            
+            NavMeshHit hit;
+            if (NavMesh.SamplePosition(theoreticalDestination, out hit, this.fleeDistance, NavMesh.AllAreas))
+                this.agent.SetDestination(hit.position);
+        }
     }
     
     public void SetSpeed(float speed) => this.agent.speed = speed;
+    public void SetFleeDistance(float distance) => this.fleeDistance = distance;
+    public void SetChaseRadius(float radius) => this.chaseRadius = radius;
+    
     private void Follow()
     {
         if (!this.target || !this.targetLeaderAgent)
@@ -94,7 +123,7 @@ public class AgentWanderingState : MonoBehaviour
         Vector3 computed = this.target.position + randomDirection;
         NavMeshHit hit;
         
-        if (NavMesh.SamplePosition(computed, out hit, 5.0f, NavMesh.AllAreas))
+        if (NavMesh.SamplePosition(computed, out hit, Mathf.Infinity, NavMesh.AllAreas))
             this.agent.SetDestination(hit.position);
     }
 
@@ -105,8 +134,8 @@ public class AgentWanderingState : MonoBehaviour
     } 
     public void SetState(AgentState newState) => this.state = newState;
     public void SetSeed(int seed) => this.seed = seed;
-
-    private void Update()
+    
+    public void EnumerateAIState()
     {
         if (!this.target && this.state == AgentState.Wander)
             Wander();
@@ -115,6 +144,9 @@ public class AgentWanderingState : MonoBehaviour
             {
                 case AgentState.Chase:
                     Chase();
+                    break;
+                case AgentState.Flee:
+                    Flee();
                     break;
                 case AgentState.Follow:
                     Follow();
@@ -130,5 +162,6 @@ public enum AgentState
 {
     Wander,
     Chase,
+    Flee,
     Follow
 }

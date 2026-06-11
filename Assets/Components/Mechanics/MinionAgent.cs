@@ -11,7 +11,7 @@ public class MinionAgent : MonoBehaviour
     private Renderer renderer;
     
     [SerializeField] private Transform currentLeader;
-    
+    private Transform lastLeader;
     private void Awake()
     {
         TryGetComponent(out this.agentAI);
@@ -26,6 +26,7 @@ public class MinionAgent : MonoBehaviour
 
     public void SetLeader(LeaderAgent leader = null)
     {
+        SoundManager.instance.PlaySoundAtPoint(this.transform.position, 1, 10f);
         leader.TryGetComponent(out NavMeshAgent agent);
         this.currentLeader = leader.transform;
         this.renderer.material.color = leader.leaderColor;
@@ -34,7 +35,14 @@ public class MinionAgent : MonoBehaviour
         this.agentAI.SetState(this.currentLeader == null ? AgentState.Wander : AgentState.Follow);
         this.agentAI.SetSeed(leader.leaderSeed);
         
-        this.agentAI.SetSpeed(this.currentLeader ? agent.speed : this.agentAI.randomSpeed);
+        this.agentAI.SetSpeed(this.currentLeader ? agent.speed * 2f : this.agentAI.randomSpeed);
+        //
+        // Physics.IgnoreCollision(GetComponent<Collider>(), this.currentLeader.GetComponent<Collider>(), false);
+        // if (this.lastLeader)
+        //     Physics.IgnoreCollision(GetComponent<Collider>(), this.lastLeader.GetComponent<Collider>(), true);
+        //
+        this.agent.radius = leader != null ? .01f : 1f;
+        this.lastLeader = leader.transform;
     }
     
     public Transform GetLeader() => this.currentLeader;

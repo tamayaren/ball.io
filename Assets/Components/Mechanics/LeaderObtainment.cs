@@ -14,7 +14,6 @@ public class LeaderObtainment : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        Debug.Log("Trigger enter STATE");
         if (other.CompareTag("Minion"))
         {
             other.TryGetComponent(out MinionAgent minionAgent);
@@ -22,10 +21,29 @@ public class LeaderObtainment : MonoBehaviour
             if (minionAgent)
             {
                 Transform ifLeader = minionAgent.GetLeader();
-                if (ifLeader) return;
+                if (ifLeader)
+                    return;
                 
-                Debug.Log("Add Minion");
+                if (this.transform.CompareTag("Player"))
+                {
+                    GameUI.instance.SetEventUI("RECRUITED NEW MINION!");
+                }
                 this.leaderAgent.AddMinion(other.transform);
+            }
+        }
+
+        LeaderAgent otherLeader;
+        if (other.gameObject.TryGetComponent(out otherLeader))
+        {
+            if (otherLeader.minions.Count > this.leaderAgent.minions.Count)
+            {
+                this.leaderAgent.TransformMinionsToLeader(otherLeader);
+
+                if (otherLeader.CompareTag("Player"))
+                    WinCondition.instance.IncrementKills();
+                
+                GameUI.instance.SetEventUI($"{this.transform.name.ToUpper()} KILLED BY {otherLeader.transform.name.ToUpper()}!");   
+                Destroy(this.gameObject);
             }
         }
     }

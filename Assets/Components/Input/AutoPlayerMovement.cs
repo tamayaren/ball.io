@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -19,11 +20,16 @@ public class AutoPlayerMovement : MonoBehaviour
         this.agent = this.target.GetComponent<NavMeshAgent>();
     }
 
+    private void OnDestroy()
+    {
+        GameUI.instance.Lose();
+    }
+
     private void Update()
     {
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
-        if (!Physics.Raycast(ray, out RaycastHit hit)) return;
+        if (!Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, LayerMask.GetMask("Ground"))) return;
         if (hit.collider.transform.parent == this.map)
             this.agent.SetDestination(hit.point);
     }
